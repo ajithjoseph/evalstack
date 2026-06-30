@@ -31,4 +31,4 @@ Follow the build log → [LinkedIn](https://www.linkedin.com/in/theajithjoseph/)
 
 ## Contributing
 
-Star the repo to follow along. PRs welcome once v0.1 ships.
+Star the repo to follow along. PRs welcome once v0.0.1 ships.
