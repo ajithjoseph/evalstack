@@ -40,6 +40,14 @@ class ContainsScorer(BaseScorer):
     """Scores 1.0 if expected string is contained in response."""
 
     def score(self, response: str, expected: str) -> Score:
+        # "" is a substring of every string, so an empty expected would
+        # pass any response. Fail it explicitly instead (DECISIONS.md D-013).
+        if not expected.strip():
+            return Score(
+                value=0.0,
+                passed=False,
+                reason="Expected value is empty; nothing to check for"
+            )
         contains = expected.strip().lower() in response.strip().lower()
         return Score(
             value=1.0 if contains else 0.0,
