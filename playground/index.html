@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EvalStack Playground</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; --card: #ffffff;
+    --border: #dcdcd6; --pass: #1f7a3a; --fail: #b3261e; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --fg: #ececea; --muted: #a0a09a; --card: #212120;
+      --border: #3a3a37; --pass: #5cc97a; --fail: #f2766d; --warn: #e0b45c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.sub { color: var(--muted); margin: 0 0 24px; }
+  label { display: block; font-weight: 600; margin: 16px 0 6px; }
+  textarea, select { width: 100%; font: inherit; color: inherit; background: var(--card);
+         border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; }
+  textarea { min-height: 90px; resize: vertical; font-family: ui-monospace, Menlo, monospace; }
+  button { margin-top: 20px; font: inherit; font-weight: 600; padding: 8px 18px;
+           border-radius: 6px; border: 1px solid var(--fg); background: var(--fg);
+           color: var(--bg); cursor: pointer; }
+  #result { margin-top: 24px; padding: 16px; border: 1px solid var(--border);
+            border-radius: 8px; background: var(--card); display: none; }
+  .row { display: flex; gap: 24px; flex-wrap: wrap; }
+  .k { color: var(--muted); font-size: 13px; }
+  .v { font-size: 20px; font-weight: 700; }
+  .pass { color: var(--pass); } .fail { color: var(--fail); } .warn { color: var(--warn); }
+  #reason { margin-top: 12px; white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body>
+<main>
+  <h1>EvalStack Playground</h1>
+  <p class="sub">Score a response against an expected value with a local scorer. Ctrl/Cmd+Enter to run.</p>
+
+  <label for="response">Response</label>
+  <textarea id="response" placeholder="The capital of France is Paris."></textarea>
+
+  <label for="expected">Expected</label>
+  <textarea id="expected" placeholder="Paris"></textarea>
+
+  <label for="scorer">Scorer</label>
+  <select id="scorer">
+    <option value="exact_match">ExactMatchScorer</option>
+    <option value="contains">ContainsScorer</option>
+    <option value="llm_judge">LLMJudgeScorer (stub)</option>
+  </select>
+
+  <button id="run" type="button">Score</button>
+
+  <section id="result" aria-live="polite">
+    <div class="row">
+      <div><div class="k">Score</div><div class="v" id="value">-</div></div>
+      <div><div class="k">Result</div><div class="v" id="verdict">-</div></div>
+    </div>
+    <div class="k" style="margin-top:12px">Reason</div>
+    <div id="reason"></div>
+  </section>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  async function run() {
+    const box = $("result");
+    box.style.display = "block";
+    $("value").textContent = "...";
+    $("verdict").textContent = "";
+    $("verdict").className = "v";
+    $("reason").textContent = "";
+    try {
+      const res = await fetch("/api/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scorer: $("scorer").value,
+          response: $("response").value,
+          expected: $("expected").value,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      if (data.not_implemented) {
+        $("value").textContent = "n/a";
+        $("verdict").textContent = "NOT IMPLEMENTED";
+        $("verdict").className = "v warn";
+      } else {
+        $("value").textContent = data.value.toFixed(2);
+        $("verdict").textContent = data.passed ? "PASS" : "FAIL";
+        $("verdict").className = "v " + (data.passed ? "pass" : "fail");
+      }
+      $("reason").textContent = data.reason;
+    } catch (err) {
+      $("value").textContent = "error";
+      $("verdict").textContent = "";
+      $("reason").textContent = String(err.message || err);
+    }
+  }
+
+  $("run").addEventListener("click", run);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run();
+  });
+</script>
+</body>
+</html>
