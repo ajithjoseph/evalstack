@@ -177,3 +177,13 @@ not from the author, so the author should correct anything that's wrong.
 - **Chosen (2026-10-30):** `run(prompt, expected)` with `expected` required, since every scorer compares against a reference. The default scorer is `ContainsScorer`, because model replies are usually full sentences ("The capital of France is Paris."), which exact match would fail. `EvalResult.metadata` holds `model`, `provider`, `scorer`, `reason` and `latency_s`. `batch` checks every item for `prompt` and `expected` before making any call, then runs them in order and stops at the first provider error.
 - **Why:** Validating first avoids paying for half a batch before a typo fails it. Stopping on error is the simplest honest behaviour.
 - **Revisit when:** batches get large: run concurrently, retry, and record per-case errors instead of stopping.
+
+## D-023: evalstack.dev is one static HTML file on GitHub Pages
+
+- **Context:** The README links to evalstack.dev, and the project had no site in the repo.
+- **Options:** a static site generator (MkDocs, Docusaurus), a hosted builder, or one hand-written HTML file.
+- **Chosen (2026-10-30):** `site/index.html`, inline CSS, no JavaScript, no build step, light and dark mode. `.github/workflows/pages.yml` deploys `site/` with the official Pages actions when it changes on `main`.
+- **Why:** A landing page for a pre-alpha project doesn't need a build pipeline. One file is easy to read, review and edit. The page lists only what works today and shows the rest as roadmap, so it can't overclaim. `tests/test_site.py` keeps its quick start identical to the README's.
+- **Note:** the stock Python `.gitignore` ignored `/site` (MkDocs' build output). That rule was removed since the project doesn't use MkDocs. If MkDocs is adopted later, give its output a different folder.
+- **Setup outside the repo:** GitHub Pages must be switched on (repo Settings, Pages, Source: GitHub Actions), and the custom domain set there, with DNS records pointing evalstack.dev at GitHub Pages.
+- **Revisit when:** the project needs real docs (API reference, guides). Then a docs generator earns its keep.

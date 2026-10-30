@@ -19,6 +19,7 @@ of cases. Multi-agent eval, RAG scoring, MCP and a dashboard are roadmap only.
 | `EvalRunner.run` / `batch`, `EvalResult` | `evalstack/core.py` | Scorer decides pass/fail (D-016, D-022) |
 | `anthropic_generate`, `openai_generate` | `evalstack/providers.py` | Thin SDK adapters (D-017) |
 | Scorer playground | `playground/` | Dev tool only, not part of the package |
+| Project website | `site/index.html` | Static page for evalstack.dev (D-023) |
 
 Nothing is stubbed today. The core package has **no required dependencies**;
 the model SDKs are optional extras (D-018).
@@ -61,6 +62,11 @@ Python 3.11 to 3.13 for every pull request and every push to `main`.
 Dependencies live only in `pyproject.toml`; there is no `requirements.txt`
 (D-020).
 
+The website is one static file, `site/index.html`, with no build step. Open it
+in a browser to preview. `.github/workflows/pages.yml` deploys it to GitHub
+Pages when `site/` changes on `main`. Its quick-start code must match the
+README's; `tests/test_site.py` fails if they drift.
+
 ## Layout
 
 ```
@@ -74,11 +80,15 @@ tests/
   test_core.py       # runner and batch, with a fake model
   test_providers.py  # adapters, with fake SDK clients
   test_playground.py # playground request handling
+  test_site.py       # website quick start matches the README
 playground/
   server.py          # http.server app, POST /api/score
   index.html         # single page UI
+site/
+  index.html         # evalstack.dev, static, no build step
 .github/workflows/
   ci.yml             # lint + tests on 3.11-3.13
+  pages.yml          # deploys site/ to GitHub Pages
 DECISIONS.md         # why things are the way they are
 .claude/skills/      # task checklists
 ```
@@ -109,6 +119,8 @@ DECISIONS.md         # why things are the way they are
 - The LLM judge has only been checked against a local fake API, not a live
   model. Its default `pass_threshold` of 0.7 is a starting guess (D-021).
 - `batch` stops at the first provider error and runs cases one at a time (D-022).
+- The README's "Why this exists" list promises hallucination scoring and MCP,
+  which aren't built. The website only claims what works today.
 
 ## Checklists
 
