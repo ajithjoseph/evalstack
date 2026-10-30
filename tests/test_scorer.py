@@ -149,5 +149,5 @@ def test_llm_judge_is_a_base_scorer():
 
 
 def test_llm_judge_not_implemented():
-    with pytest.raises(NotImplementedError, match="LLMJudgeScorer"):
+    with pytest.raises(NotImplementedError, match=r"LLMJudgeScorer ships in v0\.1\."):
         LLMJudgeScorer().score("Paris", "Paris")
