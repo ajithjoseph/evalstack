@@ -41,12 +41,21 @@ pytest -q
 ruff check .
 ```
 
+Lint must be clean. ruff is pinned to an exact version in the `[dev]` extra
+because new ruff releases add rules (D-014).
+
 ```bash
 python playground/server.py
 ```
 
 The playground serves http://127.0.0.1:8765 (stdlib only, no API keys). See
 `playground/README.md`.
+
+CI (`.github/workflows/ci.yml`) runs `ruff check .` and `pytest -q` on
+Python 3.10 to 3.13 for every pull request and every push to `main`.
+
+`requirements.txt` only points at `pyproject.toml` (`-e .[dev]`). Add
+dependencies to `pyproject.toml`, never to `requirements.txt` (D-015).
 
 ## Layout
 
@@ -62,6 +71,8 @@ tests/
 playground/
   server.py          # http.server app, POST /api/score
   index.html         # single page UI
+.github/workflows/
+  ci.yml             # lint + tests on 3.10-3.13
 DECISIONS.md         # why things are the way they are
 .claude/skills/      # task checklists
 ```
@@ -85,15 +96,8 @@ DECISIONS.md         # why things are the way they are
 
 ## Known issues (not fixed yet)
 
-- `LLMJudgeScorer` error says it "ships in v0.0.1", but the package is already
-  0.0.1 and its own docstring says v0.1.
-- `EvalRunner.run` docstring says v0.1 ships "July 2026", which has passed.
 - `EvalRunner.threshold` is stored but unused, and overlaps with `Score.passed`
   (D-008).
-- `ruff check .` reports 3 pre-existing findings in `evalstack/`
-  (`UP045` twice in `core.py`, `PIE790` in `scorer.py`). New code should add none.
-- `requirements.txt` duplicates `pyproject.toml`. `pyproject.toml` is the
-  source of truth (D-011).
 
 ## Checklists
 
