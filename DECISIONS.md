@@ -186,4 +186,5 @@ not from the author, so the author should correct anything that's wrong.
 - **Why:** A landing page for a pre-alpha project doesn't need a build pipeline. One file is easy to read, review and edit. The page lists only what works today and shows the rest as roadmap, so it can't overclaim. `tests/test_site.py` keeps its quick start identical to the README's.
 - **Note:** the stock Python `.gitignore` ignored `/site` (MkDocs' build output). That rule was removed since the project doesn't use MkDocs. If MkDocs is adopted later, give its output a different folder.
 - **Setup outside the repo:** GitHub Pages must be switched on (repo Settings, Pages, Source: GitHub Actions), and the custom domain set there, with DNS records pointing evalstack.dev at GitHub Pages.
-- **Revisit when:** the project needs real docs (API reference, guides). Then a docs generator earns its keep.
+- **Update (2026-10-30):** added `site/basics.html`, a one-page guide to the core ideas, with styles moved to a shared `site/style.css`. Its offline examples are executed by `tests/test_site.py`, so the guide fails CI if it drifts from the code.
+- **Revisit when:** the project needs real docs (API reference, many guides). Then a docs generator earns its keep.
