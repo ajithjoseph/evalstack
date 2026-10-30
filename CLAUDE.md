@@ -19,7 +19,7 @@ of cases. Multi-agent eval, RAG scoring, MCP and a dashboard are roadmap only.
 | `EvalRunner.run` / `batch`, `EvalResult` | `evalstack/core.py` | Scorer decides pass/fail (D-016, D-022) |
 | `anthropic_generate`, `openai_generate` | `evalstack/providers.py` | Thin SDK adapters (D-017) |
 | Scorer playground | `playground/` | Dev tool only, not part of the package |
-| Project website | `site/index.html` | Static page for evalstack.dev (D-023) |
+| Project website | `site/` | Landing page and Basics guide for evalstack.dev (D-023) |
 
 Nothing is stubbed today. The core package has **no required dependencies**;
 the model SDKs are optional extras (D-018).
@@ -62,10 +62,13 @@ Python 3.11 to 3.13 for every pull request and every push to `main`.
 Dependencies live only in `pyproject.toml`; there is no `requirements.txt`
 (D-020).
 
-The website is one static file, `site/index.html`, with no build step. Open it
-in a browser to preview. `.github/workflows/pages.yml` deploys it to GitHub
-Pages when `site/` changes on `main`. Its quick-start code must match the
-README's; `tests/test_site.py` fails if they drift.
+The website is plain static files in `site/` (`index.html`, `basics.html`,
+shared `style.css`), with no build step. Open them in a browser to preview.
+`.github/workflows/pages.yml` deploys them to GitHub Pages when `site/` changes
+on `main`. `tests/test_site.py` checks that the landing page's quick start
+matches the README, and runs every `<pre data-run>` example in `basics.html`,
+checking its `# ...` output comments. Examples marked `data-run` must work
+offline; anything that needs a real model goes in a plain `<pre>`.
 
 ## Layout
 
@@ -80,12 +83,14 @@ tests/
   test_core.py       # runner and batch, with a fake model
   test_providers.py  # adapters, with fake SDK clients
   test_playground.py # playground request handling
-  test_site.py       # website quick start matches the README
+  test_site.py       # website examples run and match the README
 playground/
   server.py          # http.server app, POST /api/score
   index.html         # single page UI
 site/
-  index.html         # evalstack.dev, static, no build step
+  index.html         # evalstack.dev landing page, static, no build step
+  basics.html        # guide: scores, scorers, runner, judge, providers
+  style.css          # shared styles
 .github/workflows/
   ci.yml             # lint + tests on 3.11-3.13
   pages.yml          # deploys site/ to GitHub Pages
@@ -113,6 +118,8 @@ DECISIONS.md         # why things are the way they are
   a pinned quirk, update the test and `DECISIONS.md` in the same change.
 - Record any non-obvious design choice in `DECISIONS.md`.
 - Commits use conventional prefixes: `feat:`, `test:`, `chore:`, `docs:`, `fix:`.
+- Never put Claude session links (`claude.ai/code/session_...`) in commit
+  messages, PR descriptions or comments. The repo is public.
 
 ## Known issues (not fixed yet)
 
