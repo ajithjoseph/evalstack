@@ -5,7 +5,6 @@ Handles single LLM call evaluation with scoring and logging.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -13,7 +12,7 @@ class EvalResult:
     """Result of a single evaluation run."""
     prompt: str
     response: str
-    expected: Optional[str]
+    expected: str | None
     score: float
     passed: bool
     metadata: dict
@@ -35,12 +34,12 @@ class EvalRunner:
         self.model = model
         self.threshold = threshold
 
-    def run(self, prompt: str, expected: Optional[str] = None) -> EvalResult:
+    def run(self, prompt: str, expected: str | None = None) -> EvalResult:
         """
         Run a single eval against a model.
         Returns EvalResult with score and pass/fail.
         
-        Note: LLM integration shipping in v0.1 (July 2026)
+        Note: LLM integration ships in v0.1.
         """
         raise NotImplementedError(
             "LLM integration shipping in v0.1. "
