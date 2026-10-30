@@ -5,25 +5,26 @@ Guidance for coding agents working in this repo.
 ## What this is
 
 EvalStack is an open source eval framework for LLM and multi-agent systems.
-It is at a very early stage (v0.0.1, pre-alpha). Today the only working code is
-two string scorers. The eval loop and the LLM judge are stubs.
+It is at a very early stage (v0.0.1, pre-alpha). It can send a prompt to a
+model, score the reply (exact match, contains, or an LLM judge) and run a batch
+of cases. Multi-agent eval, RAG scoring, MCP and a dashboard are roadmap only.
 
-## Real vs stubbed
+## What's real
 
-| Thing | File | Status |
+| Thing | File | Notes |
 |---|---|---|
-| `Score` dataclass (value 0.0-1.0, passed, reason) | `evalstack/scorer.py` | Real |
-| `BaseScorer` abstract base | `evalstack/scorer.py` | Real |
-| `ExactMatchScorer` | `evalstack/scorer.py` | Real |
-| `ContainsScorer` | `evalstack/scorer.py` | Real |
-| `LLMJudgeScorer.score` | `evalstack/scorer.py` | Stub, raises `NotImplementedError` |
-| `EvalResult` dataclass | `evalstack/core.py` | Real (data only) |
-| `EvalRunner.__init__` | `evalstack/core.py` | Real (stores `model`, `threshold`) |
-| `EvalRunner.run` / `batch` | `evalstack/core.py` | Stub, raises `NotImplementedError` |
-| Scorer playground | `playground/` | Real, dev tool only, not part of the package |
+| `Score` (value 0.0-1.0, passed, reason) | `evalstack/scorer.py` | |
+| `BaseScorer`, `ExactMatchScorer`, `ContainsScorer` | `evalstack/scorer.py` | No network |
+| `LLMJudgeScorer` | `evalstack/scorer.py` | Calls a model, returns a graded score (D-021) |
+| `EvalRunner.run` / `batch`, `EvalResult` | `evalstack/core.py` | Scorer decides pass/fail (D-016, D-022) |
+| `anthropic_generate`, `openai_generate` | `evalstack/providers.py` | Thin SDK adapters (D-017) |
+| Scorer playground | `playground/` | Dev tool only, not part of the package |
 
-`anthropic`, `openai` and `pydantic` are declared runtime dependencies but
-nothing imports them yet.
+Nothing is stubbed today. The core package has **no required dependencies**;
+the model SDKs are optional extras (D-018).
+
+Everything that calls a model takes a `generate` function (prompt in, text
+out). Pass a fake one in tests. **Tests must never call a real API.**
 
 ## Build, test, run
 
@@ -32,6 +33,9 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
+
+Add `anthropic`, `openai` or `all` to the extras (`".[dev,anthropic]"`) to make
+real model calls. The dev extra alone is enough for tests and lint.
 
 ```bash
 pytest -q
@@ -52,40 +56,46 @@ The playground serves http://127.0.0.1:8765 (stdlib only, no API keys). See
 `playground/README.md`.
 
 CI (`.github/workflows/ci.yml`) runs `ruff check .` and `pytest -q` on
-Python 3.10 to 3.13 for every pull request and every push to `main`.
+Python 3.11 to 3.13 for every pull request and every push to `main`.
 
-`requirements.txt` only points at `pyproject.toml` (`-e .[dev]`). Add
-dependencies to `pyproject.toml`, never to `requirements.txt` (D-015).
+Dependencies live only in `pyproject.toml`; there is no `requirements.txt`
+(D-020).
 
 ## Layout
 
 ```
 evalstack/
   __init__.py        # __version__ only
-  scorer.py          # Score, BaseScorer, ExactMatch, Contains, LLMJudge (stub)
-  core.py            # EvalResult, EvalRunner (stub)
+  scorer.py          # Score, BaseScorer, ExactMatch, Contains, LLMJudge
+  core.py            # EvalResult, EvalRunner
+  providers.py       # Generate type, Anthropic/OpenAI adapters, RefusalError
 tests/
-  test_scorer.py     # scorer behaviour incl. edge cases
-  test_core.py       # EvalResult, EvalRunner stub behaviour
+  test_scorer.py     # scorers incl. edge cases and judge reply parsing
+  test_core.py       # runner and batch, with a fake model
+  test_providers.py  # adapters, with fake SDK clients
   test_playground.py # playground request handling
 playground/
   server.py          # http.server app, POST /api/score
   index.html         # single page UI
 .github/workflows/
-  ci.yml             # lint + tests on 3.10-3.13
+  ci.yml             # lint + tests on 3.11-3.13
 DECISIONS.md         # why things are the way they are
 .claude/skills/      # task checklists
 ```
 
 ## Conventions
 
-- Python 3.10+. Built-in generics (`list[dict]`) are fine.
+- Python 3.11+ (D-019). Built-in generics and `X | None` are fine.
 - Each module starts with a `# path` comment line and a short module docstring.
 - Scorers subclass `BaseScorer`, implement `score(response, expected) -> Score`,
   and always return a `Score` with `value` in 0.0-1.0 and a human readable `reason`.
 - Built-in string scorers normalise with `.strip().lower()` on both sides.
   Inner whitespace and punctuation are not normalised.
 - `ContainsScorer` fails an empty or whitespace-only `expected` (D-013).
+- Provider errors, refusals and malformed judge replies are **raised**, never
+  turned into a score. A failing eval and a broken eval must look different.
+- Model SDKs are imported lazily inside the adapters, so `import evalstack`
+  works without them. A missing SDK raises `ImportError` naming the extra.
 - Unbuilt features raise `NotImplementedError` with a message that says when
   they ship and what to use instead. Never return a fake result.
 - Tests are plain pytest functions, one behaviour per test, `parametrize` for
@@ -96,12 +106,13 @@ DECISIONS.md         # why things are the way they are
 
 ## Known issues (not fixed yet)
 
-- `EvalRunner.threshold` is stored but unused, and overlaps with `Score.passed`
-  (D-008).
+- The LLM judge has only been checked against a local fake API, not a live
+  model. Its default `pass_threshold` of 0.7 is a starting guess (D-021).
+- `batch` stops at the first provider error and runs cases one at a time (D-022).
 
 ## Checklists
 
 See `.claude/skills/`:
 - `add-scorer` for adding a new scorer
-- `implement-stub` for replacing a `NotImplementedError` stub
+- `implement-stub` for building something that is currently a stub
 - `verify-before-commit` before every commit
