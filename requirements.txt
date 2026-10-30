@@ -1,3 +1,0 @@
-# pyproject.toml is the single source of truth for dependencies (DECISIONS.md D-015).
-# This file only exists so `pip install -r requirements.txt` still works.
--e .[dev]
