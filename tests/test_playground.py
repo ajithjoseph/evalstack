@@ -33,12 +33,48 @@ def test_contains_empty_expected_fails():
     assert "empty" in body["reason"]
 
 
-def test_llm_judge_reports_not_implemented():
+def use_judge(monkeypatch, generate):
+    monkeypatch.setitem(server.SCORERS, "llm_judge",
+                        lambda: server.LLMJudgeScorer(model="m", generate=generate))
+
+
+def test_llm_judge_scores(monkeypatch):
+    use_judge(monkeypatch, lambda p: '{"score": 0.8, "reason": "Close"}')
     status, body = server.score_request(
         {"scorer": "llm_judge", "response": "a", "expected": "b"})
     assert status == 200
-    assert body["not_implemented"] is True
-    assert "LLMJudgeScorer" in body["reason"]
+    assert body == {"scorer": "llm_judge", "value": 0.8,
+                    "passed": True, "reason": "Close"}
+
+
+def test_llm_judge_without_sdk_is_unavailable(monkeypatch):
+    def no_sdk(prompt):
+        raise ImportError("pip install 'evalstack[anthropic]'")
+
+    use_judge(monkeypatch, no_sdk)
+    status, body = server.score_request(
+        {"scorer": "llm_judge", "response": "a", "expected": "b"})
+    assert status == 200
+    assert body["unavailable"] is True
+    assert "evalstack[anthropic]" in body["reason"]
+
+
+def test_llm_judge_api_error_is_an_error_not_a_score(monkeypatch):
+    def broken(prompt):
+        raise ConnectionError("network down")
+
+    use_judge(monkeypatch, broken)
+    status, body = server.score_request(
+        {"scorer": "llm_judge", "response": "a", "expected": "b"})
+    assert status == 502
+    assert body == {"error": "ConnectionError: network down"}
+
+
+def test_default_judge_model(monkeypatch):
+    monkeypatch.delenv("EVALSTACK_JUDGE_MODEL", raising=False)
+    assert server.SCORERS["llm_judge"]().model == "claude-opus-5-5"
+    monkeypatch.setenv("EVALSTACK_JUDGE_MODEL", "claude-haiku-5-5")
+    assert server.SCORERS["llm_judge"]().model == "claude-haiku-5-5"
 
 
 def test_unknown_scorer_rejected():

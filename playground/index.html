@@ -52,7 +52,7 @@
   <select id="scorer">
     <option value="exact_match">ExactMatchScorer</option>
     <option value="contains">ContainsScorer</option>
-    <option value="llm_judge">LLMJudgeScorer (stub)</option>
+    <option value="llm_judge">LLMJudgeScorer (calls a model)</option>
   </select>
 
   <button id="run" type="button">Score</button>
@@ -88,9 +88,9 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || res.statusText);
-      if (data.not_implemented) {
+      if (data.unavailable) {
         $("value").textContent = "n/a";
-        $("verdict").textContent = "NOT IMPLEMENTED";
+        $("verdict").textContent = "UNAVAILABLE";
         $("verdict").className = "v warn";
       } else {
         $("value").textContent = data.value.toFixed(2);
