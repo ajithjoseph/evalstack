@@ -36,8 +36,9 @@ Run from the repo root inside the venv (`source .venv/bin/activate`).
    ```
    - no secrets, API keys, `.venv/` or `__pycache__/`,
    - no stray debug prints,
+   - no test calls a real model API,
    - stubs still raise `NotImplementedError` unless this change implements them.
-6. **Docs in sync**: `CLAUDE.md` (Real vs stubbed, Known issues) and
+6. **Docs in sync**: `CLAUDE.md` (What's real, Known issues) and
    `DECISIONS.md` reflect the change.
 7. **Commit message** uses a conventional prefix (`feat:`, `fix:`, `test:`,
    `docs:`, `chore:`) and says why, not just what.
