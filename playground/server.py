@@ -1,7 +1,9 @@
 """
 Local playground for trying EvalStack scorers in a browser.
 
-Standard library only, no API keys. Binds to 127.0.0.1 by default.
+Standard library only. Binds to 127.0.0.1 by default. The string scorers
+need no API keys; the LLM judge needs the anthropic SDK and credentials, and
+uses EVALSTACK_JUDGE_MODEL (default claude-opus-5-5).
 
     python playground/server.py            # http://127.0.0.1:8765
     python playground/server.py --port 9000
@@ -9,15 +11,19 @@ Standard library only, no API keys. Binds to 127.0.0.1 by default.
 
 import argparse
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from evalstack.scorer import ContainsScorer, ExactMatchScorer, LLMJudgeScorer
 
+DEFAULT_JUDGE_MODEL = "claude-opus-5-5"
+
 SCORERS = {
     "exact_match": ExactMatchScorer,
     "contains": ContainsScorer,
-    "llm_judge": LLMJudgeScorer,
+    "llm_judge": lambda: LLMJudgeScorer(
+        model=os.environ.get("EVALSTACK_JUDGE_MODEL", DEFAULT_JUDGE_MODEL)),
 }
 
 INDEX_HTML = Path(__file__).with_name("index.html")
@@ -35,8 +41,10 @@ def score_request(payload: dict) -> tuple[int, dict]:
         return 400, {"error": "response and expected must be strings"}
     try:
         result = SCORERS[name]().score(response, expected)
-    except NotImplementedError as exc:
-        return 200, {"scorer": name, "not_implemented": True, "reason": str(exc)}
+    except ImportError as exc:
+        return 200, {"scorer": name, "unavailable": True, "reason": str(exc)}
+    except Exception as exc:  # noqa: BLE001  show any provider error in the page, never as a score
+        return 502, {"error": f"{type(exc).__name__}: {exc}"}
     return 200, {
         "scorer": name,
         "value": result.value,

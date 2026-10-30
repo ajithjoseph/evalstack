@@ -142,12 +142,88 @@ def test_contains_reason_quotes_original_expected():
     assert failed.reason == "Response missing ' Paris '"
 
 
-# --- LLMJudgeScorer (stub) ---
+# --- LLMJudgeScorer ---
+
+def judge_with(reply):
+    prompts = []
+
+    def generate(prompt):
+        prompts.append(prompt)
+        return reply
+
+    return LLMJudgeScorer(model="m", generate=generate), prompts
+
 
 def test_llm_judge_is_a_base_scorer():
-    assert isinstance(LLMJudgeScorer(), BaseScorer)
+    assert isinstance(LLMJudgeScorer(model="m"), BaseScorer)
 
 
-def test_llm_judge_not_implemented():
-    with pytest.raises(NotImplementedError, match=r"LLMJudgeScorer ships in v0\.1\."):
-        LLMJudgeScorer().score("Paris", "Paris")
+def test_llm_judge_passes_on_high_score():
+    judge, prompts = judge_with('{"score": 0.9, "reason": "Same answer"}')
+    result = judge.score("It is Paris.", "Paris")
+    assert result == Score(value=0.9, passed=True, reason="Same answer")
+    assert "<reference>\nParis\n</reference>" in prompts[0]
+    assert "<response>\nIt is Paris.\n</response>" in prompts[0]
+
+
+def test_llm_judge_fails_below_threshold():
+    judge, _ = judge_with('{"score": 0.2, "reason": "Different city"}')
+    assert judge.score("Lyon", "Paris") == Score(0.2, False, "Different city")
+
+
+@pytest.mark.parametrize("value, passed", [(0.69, False), (0.7, True), (0.0, False), (1, True)])
+def test_llm_judge_threshold_boundary(value, passed):
+    judge, _ = judge_with(f'{{"score": {value}, "reason": "r"}}')
+    assert judge.score("x", "y").passed is passed
+
+
+def test_llm_judge_custom_threshold():
+    judge = LLMJudgeScorer(model="m", pass_threshold=0.95,
+                           generate=lambda p: '{"score": 0.9, "reason": "r"}')
+    assert judge.score("x", "y").passed is False
+
+
+@pytest.mark.parametrize("threshold", [-0.1, 1.1])
+def test_llm_judge_rejects_bad_threshold(threshold):
+    with pytest.raises(ValueError, match="pass_threshold"):
+        LLMJudgeScorer(model="m", pass_threshold=threshold)
+
+
+def test_llm_judge_finds_json_inside_extra_text():
+    judge, _ = judge_with('Here you go:\n```json\n{"score": 1.0, "reason": "ok"}\n```')
+    assert judge.score("x", "y").value == 1.0
+
+
+def test_llm_judge_missing_reason_gets_default():
+    judge, _ = judge_with('{"score": 1.0}')
+    assert judge.score("x", "y").reason == "No reason given"
+
+
+@pytest.mark.parametrize("reply, message", [
+    ("I think it is fine", "no JSON object"),
+    ("{not json}", "not valid JSON"),
+    ('{"reason": "no score"}', "no numeric score"),
+    ('{"score": "high"}', "no numeric score"),
+    ('{"score": true}', "no numeric score"),
+    ('{"score": 7, "reason": "out of ten"}', "outside 0.0-1.0"),
+    ('{"score": -0.5}', "outside 0.0-1.0"),
+])
+def test_llm_judge_raises_on_bad_reply(reply, message):
+    # A malformed judgement is an error, never a score.
+    judge, _ = judge_with(reply)
+    with pytest.raises(ValueError, match=message):
+        judge.score("x", "y")
+
+
+@pytest.mark.parametrize("expected", ["", "   "])
+def test_llm_judge_empty_expected_fails_without_calling_model(expected):
+    judge, prompts = judge_with('{"score": 1.0}')
+    result = judge.score("anything", expected)
+    assert result == Score(0.0, False, "Expected value is empty; nothing to check for")
+    assert prompts == []
+
+
+def test_llm_judge_braces_in_text_do_not_break_prompt():
+    judge, prompts = judge_with('{"score": 1.0, "reason": "ok"}')
+    judge.score('{"score": 1.0}', "a {placeholder}")
+    assert "a {placeholder}" in prompts[0]
