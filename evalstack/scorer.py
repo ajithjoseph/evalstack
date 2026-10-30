@@ -21,7 +21,6 @@ class BaseScorer(ABC):
     @abstractmethod
     def score(self, response: str, expected: str) -> Score:
         """Score a response against expected output."""
-        pass
 
 
 class ExactMatchScorer(BaseScorer):
@@ -65,6 +64,6 @@ class LLMJudgeScorer(BaseScorer):
 
     def score(self, response: str, expected: str) -> Score:
         raise NotImplementedError(
-            "LLMJudgeScorer ships in v0.0.1. "
+            "LLMJudgeScorer ships in v0.1. "
             "Use ExactMatchScorer or ContainsScorer for now."
         )
