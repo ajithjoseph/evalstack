@@ -25,6 +25,6 @@ description: Checklist for adding a new scorer to evalstack/scorer.py, with test
 4. **Wire into the playground**: add it to `SCORERS` in `playground/server.py`
    and an `<option>` in `playground/index.html`. Add one case to
    `tests/test_playground.py`.
-5. **Docs**: update the Real vs stubbed table in `CLAUDE.md`. Add a
+5. **Docs**: update the What's real table in `CLAUDE.md`. Add a
    `DECISIONS.md` entry for any non-obvious choice.
 6. Run the `verify-before-commit` checklist.

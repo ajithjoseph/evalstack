@@ -42,7 +42,7 @@ not from the author, so the author should correct anything that's wrong.
 - **Why:** Shows the intended API and fails loudly instead of returning a fake score.
 - **Revisit when:** each feature ships. Tests in `tests/test_core.py` and `tests/test_scorer.py` pin the stub behaviour and must be replaced with real tests at that point. The stub messages were made consistent (all say v0.1) on 2026-10-30.
 
-## D-005: `anthropic`, `openai`, `pydantic` are hard runtime dependencies
+## D-005: `anthropic`, `openai`, `pydantic` are hard runtime dependencies (superseded by D-018)
 
 - **Context:** The roadmap needs LLM calls; both major SDKs are listed.
 - **Options:** hard deps, optional extras (`evalstack[anthropic]`), or no SDK (raw HTTP).
@@ -66,14 +66,14 @@ not from the author, so the author should correct anything that's wrong.
 - **Why:** Changing scorer semantics is the author's call, not a test-writing task's. But (a) is a silent false pass, which is the worst failure for an eval tool. Leaning (b).
 - **Revisit:** before v0.1. When changed, update the test and this entry.
 
-## D-008: `EvalRunner` has a `threshold` (default 0.8) separate from `Score.passed` (open)
+## D-008: `EvalRunner` has a `threshold` (default 0.8) separate from `Score.passed` (superseded by D-016)
 
 - **Context:** Scorers already decide `passed`; the runner also takes `threshold=0.8` but doesn't use it yet.
 - **Options:** runner overrides pass/fail with `score.value >= threshold`; scorer stays the only judge; or scorers take their own threshold.
 - **Chosen:** not decided. Both exist today.
 - **Revisit:** when implementing `EvalRunner.run`. Two sources of truth for pass/fail will confuse users. For binary scorers a threshold of 0.8 is meaningless.
 
-## D-009: Python 3.10+
+## D-009: Python 3.10+ (superseded by D-019)
 
 - **Context:** Code uses built-in generics (`list[dict]`).
 - **Chosen:** `requires-python = ">=3.10"`.
@@ -111,7 +111,7 @@ not from the author, so the author should correct anything that's wrong.
 - **Not changed:** `ExactMatchScorer` with both sides empty still passes, since empty equals empty is a correct exact match.
 - **Revisit when:** `EvalRunner.batch` exists. If bad test data should stop a run, validate the dataset up front rather than raising inside the scorer.
 
-## D-014: CI runs ruff and pytest on Python 3.10-3.13, with ruff pinned exactly
+## D-014: CI runs ruff and pytest on Python 3.10-3.13, with ruff pinned exactly (matrix narrowed to 3.11-3.13 by D-019)
 
 - **Context:** There was no CI, so nothing checked a PR except whoever ran the tests locally.
 - **Options:** GitHub Actions with a version matrix, a single version, or pre-commit hooks only.
@@ -119,10 +119,61 @@ not from the author, so the author should correct anything that's wrong.
 - **Why:** The suite runs in well under a second, so a 4-version matrix costs nothing and covers every version `requires-python` allows. ruff is pinned to `==0.17.3` because its default rule set grows between releases (0.17 flags `UP045` and `PIE790`), and an unpinned ruff would turn CI red with no code change. The 3 pre-existing findings were fixed so lint can be a real gate.
 - **Revisit when:** bumping ruff (do it on purpose, fix new findings in the same PR), dropping a Python version, or when tests need API keys (keep those out of the default job).
 
-## D-015: `requirements.txt` defers to `pyproject.toml`
+## D-015: `requirements.txt` defers to `pyproject.toml` (superseded by D-020)
 
 - **Context:** Supersedes the "revisit" in D-011. `requirements.txt` listed its own runtime and dev dependencies, which had already drifted (`black`, `pytest-asyncio`, `httpx` were listed there but used nowhere).
 - **Options:** delete it, keep both in sync by hand, or make it a one-line pointer.
 - **Chosen (2026-10-30):** a one-line pointer, `-e .[dev]`.
 - **Why:** One source of truth, while `pip install -r requirements.txt` keeps working for anyone used to it. `httpx` still gets installed as a dependency of `anthropic` and `openai`.
 - **Revisit when:** nobody uses `requirements.txt` any more; then delete it.
+
+## D-016: The scorer alone decides pass/fail; `EvalRunner.threshold` removed
+
+- **Context:** Supersedes D-008. The runner took `threshold=0.8` but never used it, while every scorer already returns `passed`.
+- **Options:** (a) runner overrides pass/fail with `score.value >= threshold`, (b) the scorer is the only judge and graded scorers take their own threshold, (c) keep both.
+- **Chosen (2026-10-30):** (b). `EvalRunner` no longer has `threshold`. `LLMJudgeScorer` takes `pass_threshold`.
+- **Why:** One source of truth. A runner-level 0.8 means nothing for the 0/1 string scorers, and different graded scorers need different cut-offs.
+- **Revisit when:** a run mixes several scorers and needs an overall pass rule; that belongs in a report layer, not the runner.
+
+## D-017: Model calls go through a `generate(prompt) -> str` function, with thin SDK adapters
+
+- **Context:** The eval loop and the judge both need a model. The README promises no vendor lock-in, and tests must never call a real API.
+- **Options:** (a) hard-code the Anthropic client, (b) a provider abstraction class hierarchy, (c) a plain function type plus small adapters.
+- **Chosen (2026-10-30):** (c). `evalstack/providers.py` defines `Generate = Callable[[str], str]`, `anthropic_generate`, `openai_generate` and `make_generate(provider, model)`. `EvalRunner` and `LLMJudgeScorer` accept `provider=` or a ready `generate=`.
+- **Details:** The Anthropic adapter uses `max_tokens=16000`, returns the text blocks only, and raises `RefusalError` on `stop_reason == "refusal"`. On models that support it (Fable 5.1, Opus 5.5, Opus 5, Sonnet 5.5) it opts into server-side refusal fallback (`fallbacks="default"`, beta `server-side-fallback-2026-07-01`), so a safety decline is retried on Anthropic's recommended model instead of failing the eval. The OpenAI adapter uses Chat Completions and raises `RefusalError` when `message.refusal` is set. Clients are built on first use, so constructing a runner needs no SDK or key.
+- **Why:** Any provider, local model or test fake is just a function. The adapters were checked with the real SDKs (anthropic 2.3.0, openai 3.41.0) against a local fake API; not yet against live models.
+- **Revisit when:** evals need multi-turn conversations, system prompts, tools or token usage. Then `generate` needs to return more than a string.
+
+## D-018: Model SDKs are optional extras; no required dependencies
+
+- **Context:** Supersedes D-005. `anthropic`, `openai` and `pydantic` were required but nothing imported them.
+- **Chosen (2026-10-30):** `dependencies = []`. Extras: `anthropic` (`anthropic>=2.3.0`), `openai` (`openai>=1.0.0`), `all`. `pydantic` is dropped since nothing uses it.
+- **Why:** Installing the string scorers shouldn't pull two large SDKs. The anthropic floor is the version the `fallbacks` parameter was verified on. Adapters import their SDK lazily and raise an `ImportError` that names the extra.
+- **Revisit when:** something in the core genuinely needs a dependency (e.g. pydantic for result serialisation, D-002).
+
+## D-019: Python 3.11+
+
+- **Context:** Supersedes D-009. Python 3.10 reached end of life in October 2026.
+- **Chosen (2026-10-30):** `requires-python = ">=3.11"`, CI matrix 3.11-3.13.
+- **Revisit when:** 3.11 nears end of life (October 2027), or 3.14 should join the CI matrix.
+
+## D-020: `requirements.txt` deleted
+
+- **Context:** Supersedes D-015. It only pointed at `-e .[dev]`.
+- **Chosen (2026-10-30):** deleted. Install with `pip install -e ".[dev]"`.
+- **Why:** One fewer file to keep in sync. The README and CLAUDE.md give the install command.
+
+## D-021: `LLMJudgeScorer` grades meaning against the reference, 0.0-1.0, passing at 0.7
+
+- **Context:** The judge stub needed a real design.
+- **Chosen (2026-10-30):** One model call with a fixed prompt that asks how well the response matches the meaning of `expected`, ignoring wording, and to reply with only `{"score": <0-1>, "reason": "..."}`. The first `{...}` in the reply is parsed. A missing JSON object, invalid JSON, a non-numeric or boolean score, or a score outside 0.0-1.0 raises `ValueError`. `passed = score >= pass_threshold` (default 0.7, must be within 0.0-1.0). An empty `expected` fails without calling the model, matching D-013. The model is required; there is no default model in the library. The playground defaults to `claude-opus-5-5` (overridable with `EVALSTACK_JUDGE_MODEL`).
+- **Why:** A bad judge reply is a broken eval, not a failing answer, so it raises. The reference and response are wrapped in tags and the prompt says their contents are data, which makes it harder (not impossible) for a response to talk the judge into a high score.
+- **Known gaps:** the threshold of 0.7 is a starting guess; the judge sees no original prompt (D-001's signature has none); no structured outputs yet.
+- **Revisit when:** there is a labelled set to calibrate the threshold against, or the scorer signature gains the prompt.
+
+## D-022: `EvalRunner.run` requires `expected`, defaults to `ContainsScorer`, `batch` fails fast
+
+- **Context:** Building `run` and `batch`.
+- **Chosen (2026-10-30):** `run(prompt, expected)` with `expected` required, since every scorer compares against a reference. The default scorer is `ContainsScorer`, because model replies are usually full sentences ("The capital of France is Paris."), which exact match would fail. `EvalResult.metadata` holds `model`, `provider`, `scorer`, `reason` and `latency_s`. `batch` checks every item for `prompt` and `expected` before making any call, then runs them in order and stops at the first provider error.
+- **Why:** Validating first avoids paying for half a batch before a typo fails it. Stopping on error is the simplest honest behaviour.
+- **Revisit when:** batches get large: run concurrently, retry, and record per-case errors instead of stopping.
