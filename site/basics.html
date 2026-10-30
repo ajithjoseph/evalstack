@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EvalStack Basics</title>
+<meta name="description" content="The core ideas in EvalStack: scores, scorers, the eval runner, the LLM judge and model providers.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231d1d1b'/><path d='M9 17l4.5 4.5L23 11' stroke='%23f7f7f5' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="index.html">EvalStack</a>
+    <nav>
+      <a href="index.html#quick-start">Quick start</a>
+      <a href="basics.html">Basics</a>
+      <a href="https://github.com/ajithjoseph/evalstack">GitHub</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <p class="crumb">Guide</p>
+    <h1>The basics</h1>
+    <p class="lede">An eval is a prompt, the answer you expect, and a rule for judging the
+      model's reply. EvalStack has three pieces: a <strong>score</strong>, a
+      <strong>scorer</strong> that produces it, and a <strong>runner</strong> that calls the
+      model and applies the scorer.</p>
+    <ol class="toc">
+      <li><a href="#score">Score</a></li>
+      <li><a href="#scorers">Scorers</a></li>
+      <li><a href="#runner">Running evals</a></li>
+      <li><a href="#judge">The LLM judge</a></li>
+      <li><a href="#providers">Models and providers</a></li>
+      <li><a href="#errors">When something goes wrong</a></li>
+    </ol>
+
+    <section id="score">
+      <h2>1. Score</h2>
+      <p>Every scorer returns a <code>Score</code> with three fields:</p>
+      <div class="table-wrap"><table>
+        <tr><th>Field</th><th>Meaning</th></tr>
+        <tr><td><code>value</code></td><td>A number from 0.0 (wrong) to 1.0 (right).</td></tr>
+        <tr><td><code>passed</code></td><td>Whether this counts as a pass. The scorer decides.</td></tr>
+        <tr><td><code>reason</code></td><td>A short, human-readable explanation.</td></tr>
+      </table></div>
+    </section>
+
+    <section id="scorers">
+      <h2>2. Scorers</h2>
+      <p>A scorer compares a model's <em>response</em> with the <em>expected</em> answer.
+        The two string scorers ignore case and leading or trailing whitespace.</p>
+      <div class="table-wrap"><table>
+        <tr><th>Scorer</th><th>Passes when</th><th>Calls a model?</th></tr>
+        <tr><td><code>ExactMatchScorer</code></td><td>The whole response equals the expected text.</td><td>No</td></tr>
+        <tr><td><code>ContainsScorer</code></td><td>The expected text appears anywhere in the response.</td><td>No</td></tr>
+        <tr><td><code>LLMJudgeScorer</code></td><td>A model grades the meaning as close enough (0.7 or higher by default).</td><td>Yes</td></tr>
+      </table></div>
+      <p>The string scorers need no API key, so you can try them right away:</p>
+<pre data-run><code>from evalstack.scorer import ContainsScorer, ExactMatchScorer
+
+reply = "The capital of France is Paris."
+
+print(ExactMatchScorer().score(reply, "Paris"))
+# Score(value=0.0, passed=False, reason='No exact match')
+
+print(ContainsScorer().score(reply, "paris"))
+# Score(value=1.0, passed=True, reason="Response contains 'paris'")</code></pre>
+      <div class="note">With <code>ContainsScorer</code> and the judge, an empty
+        <code>expected</code> always fails. An empty string is "contained" in every reply, so
+        letting it pass would hide a broken test case.</div>
+    </section>
+
+    <section id="runner">
+      <h2>3. Running evals</h2>
+      <p><code>EvalRunner</code> sends the prompt to a model, scores the reply, and returns an
+        <code>EvalResult</code>. Its default scorer is <code>ContainsScorer</code>, because
+        models usually answer in full sentences.</p>
+<pre><code>from evalstack.core import EvalRunner
+
+runner = EvalRunner(model="claude-opus-5-5")
+result = runner.run("What is the capital of France?", expected="Paris")
+
+# Example values; the model's exact wording will vary:
+result.passed               # True
+result.score                # 1.0
+result.response             # "The capital of France is Paris."
+result.metadata["reason"]   # "Response contains 'Paris'"</code></pre>
+      <p><code>metadata</code> also records the <code>model</code>, <code>provider</code>,
+        <code>scorer</code> and <code>latency_s</code> (seconds the model took).</p>
+      <p>To run many cases, pass a list to <code>batch</code>. Every case is checked for
+        <code>prompt</code> and <code>expected</code> before any model call, so a typo
+        doesn't cost you half a run:</p>
+<pre><code>results = runner.batch([
+    {"prompt": "Capital of France?", "expected": "Paris"},
+    {"prompt": "Capital of Japan?", "expected": "Tokyo"},
+])
+print(sum(r.passed for r in results), "of", len(results), "passed")</code></pre>
+    </section>
+
+    <section id="judge">
+      <h2>4. The LLM judge</h2>
+      <p>String matching can't tell that "It's Paris, the French capital" means the same as
+        "Paris". <code>LLMJudgeScorer</code> asks a model to grade the meaning from 0.0 to
+        1.0 and passes at <code>pass_threshold</code> (0.7 by default):</p>
+<pre><code>from evalstack.scorer import LLMJudgeScorer
+
+judge = LLMJudgeScorer(model="claude-opus-5-5", pass_threshold=0.8)
+runner = EvalRunner(model="claude-opus-5-5", scorer=judge)</code></pre>
+      <p>The judge makes one extra model call per case, so it costs more than the string
+        scorers. Use it when wording varies but meaning matters.</p>
+    </section>
+
+    <section id="providers">
+      <h2>5. Models and providers</h2>
+      <p>The core package has no required dependencies. Install the SDK for the provider you
+        use:</p>
+<pre><code>pip install -e ".[anthropic]"   # Claude models (default)
+pip install -e ".[openai]"      # OpenAI models, with provider="openai"</code></pre>
+      <p>Anything that calls a model also accepts <code>generate</code>: any function that
+        takes a prompt and returns text. Use it for another provider, a local model, or a
+        fake in tests. This example runs with no API key:</p>
+<pre data-run><code>from evalstack.core import EvalRunner
+
+def fake_model(prompt):
+    return "The capital of France is Paris."
+
+runner = EvalRunner(model="fake", generate=fake_model)
+result = runner.run("What is the capital of France?", expected="Paris")
+print(result.passed, result.metadata["reason"])
+# True Response contains 'Paris'</code></pre>
+    </section>
+
+    <section id="errors">
+      <h2>6. When something goes wrong</h2>
+      <p>A failing eval and a broken eval should never look the same, so EvalStack raises an
+        error instead of guessing a score:</p>
+      <div class="table-wrap"><table>
+        <tr><th>Problem</th><th>What you get</th></tr>
+        <tr><td>Provider SDK not installed</td><td><code>ImportError</code> naming the extra to install</td></tr>
+        <tr><td>API error or timeout</td><td>The SDK's own exception</td></tr>
+        <tr><td>The model declines to answer</td><td><code>RefusalError</code></td></tr>
+        <tr><td>The judge's reply can't be read</td><td><code>ValueError</code></td></tr>
+      </table></div>
+      <p>To try scorers by hand, run the local playground from a clone of the repo:
+        <code>python playground/server.py</code>.</p>
+    </section>
+  </main>
+
+  <footer>
+    EvalStack is open source under the MIT license. Built by Ajith Joseph.
+  </footer>
+</div>
+</body>
+</html>
