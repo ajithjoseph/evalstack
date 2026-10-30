@@ -20,7 +20,7 @@ Run from the repo root inside the venv (`source .venv/bin/activate`).
    ```bash
    ruff check .
    ```
-   No new findings. The 3 pre-existing ones listed in `CLAUDE.md` are known.
+   Must be clean. CI runs the same check and fails on any finding.
 4. **Playground smoke test** (only if `evalstack/` or `playground/` changed)
    ```bash
    python playground/server.py --port 8765

@@ -40,7 +40,7 @@ not from the author, so the author should correct anything that's wrong.
 - **Options:** leave classes out until ready, or ship stubs.
 - **Chosen:** stubs (`LLMJudgeScorer.score`, `EvalRunner.run`, `EvalRunner.batch`) that raise with a "ships in ..." message.
 - **Why:** Shows the intended API and fails loudly instead of returning a fake score.
-- **Revisit when:** each feature ships. Tests in `tests/test_core.py` and `tests/test_scorer.py` pin the stub behaviour and must be replaced with real tests at that point. Also: the stub messages are inconsistent today (see CLAUDE.md, Known issues).
+- **Revisit when:** each feature ships. Tests in `tests/test_core.py` and `tests/test_scorer.py` pin the stub behaviour and must be replaced with real tests at that point. The stub messages were made consistent (all say v0.1) on 2026-10-30.
 
 ## D-005: `anthropic`, `openai`, `pydantic` are hard runtime dependencies
 
@@ -110,3 +110,19 @@ not from the author, so the author should correct anything that's wrong.
 - **Why:** A false pass is the worst failure for an eval tool. Failing (rather than raising) keeps a batch run going while still surfacing the bad test case in the results, and matches how scorers report every other problem: through `reason`.
 - **Not changed:** `ExactMatchScorer` with both sides empty still passes, since empty equals empty is a correct exact match.
 - **Revisit when:** `EvalRunner.batch` exists. If bad test data should stop a run, validate the dataset up front rather than raising inside the scorer.
+
+## D-014: CI runs ruff and pytest on Python 3.10-3.13, with ruff pinned exactly
+
+- **Context:** There was no CI, so nothing checked a PR except whoever ran the tests locally.
+- **Options:** GitHub Actions with a version matrix, a single version, or pre-commit hooks only.
+- **Chosen (2026-10-30):** `.github/workflows/ci.yml` on pull requests and pushes to `main`. It installs `.[dev]`, then runs `ruff check .` and `pytest -q` on Python 3.10, 3.11, 3.12 and 3.13. `fail-fast: false` so one version failing still shows the others. Read-only token permissions.
+- **Why:** The suite runs in well under a second, so a 4-version matrix costs nothing and covers every version `requires-python` allows. ruff is pinned to `==0.17.3` because its default rule set grows between releases (0.17 flags `UP045` and `PIE790`), and an unpinned ruff would turn CI red with no code change. The 3 pre-existing findings were fixed so lint can be a real gate.
+- **Revisit when:** bumping ruff (do it on purpose, fix new findings in the same PR), dropping a Python version, or when tests need API keys (keep those out of the default job).
+
+## D-015: `requirements.txt` defers to `pyproject.toml`
+
+- **Context:** Supersedes the "revisit" in D-011. `requirements.txt` listed its own runtime and dev dependencies, which had already drifted (`black`, `pytest-asyncio`, `httpx` were listed there but used nowhere).
+- **Options:** delete it, keep both in sync by hand, or make it a one-line pointer.
+- **Chosen (2026-10-30):** a one-line pointer, `-e .[dev]`.
+- **Why:** One source of truth, while `pip install -r requirements.txt` keeps working for anyone used to it. `httpx` still gets installed as a dependency of `anthropic` and `openai`.
+- **Revisit when:** nobody uses `requirements.txt` any more; then delete it.
