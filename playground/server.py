@@ -14,6 +14,7 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from evalstack.scorer import ContainsScorer, ExactMatchScorer, LLMJudgeScorer
 
@@ -28,6 +29,7 @@ SCORERS = {
 
 INDEX_HTML = Path(__file__).with_name("index.html")
 MAX_BODY_BYTES = 1_000_000
+LOCAL_HOSTNAMES = {"127.0.0.1", "localhost", "::1"}
 
 
 def score_request(payload: dict) -> tuple[int, dict]:
@@ -64,7 +66,16 @@ class Handler(BaseHTTPRequestHandler):
     def _send_json(self, status: int, data: dict) -> None:
         self._send(status, json.dumps(data).encode(), "application/json")
 
+    def _host_allowed(self) -> bool:
+        # Only answer requests addressed to this machine by name. This blocks
+        # DNS rebinding, where a web page points its own hostname at 127.0.0.1.
+        hostname = urlsplit("//" + self.headers.get("Host", "")).hostname
+        return hostname in LOCAL_HOSTNAMES | {self.server.server_address[0]}
+
     def do_GET(self):
+        if not self._host_allowed():
+            self._send_json(403, {"error": "Unexpected Host header"})
+            return
         if self.path in ("/", "/index.html"):
             self._send(200, INDEX_HTML.read_bytes(), "text/html; charset=utf-8")
         elif self.path == "/api/scorers":
@@ -73,10 +84,26 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(404, {"error": "Not found"})
 
     def do_POST(self):
+        if not self._host_allowed():
+            self._send_json(403, {"error": "Unexpected Host header"})
+            return
         if self.path != "/api/score":
             self._send_json(404, {"error": "Not found"})
             return
-        length = int(self.headers.get("Content-Length") or 0)
+        # Requiring JSON makes browsers send a CORS preflight for cross-site
+        # requests, which this server never approves, so other web pages
+        # can't make your browser run (and pay for) a score.
+        content_type = self.headers.get("Content-Type", "").split(";")[0].strip()
+        if content_type != "application/json":
+            self._send_json(415, {"error": "Content-Type must be application/json"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if length < 0:
+            self._send_json(400, {"error": "Invalid Content-Length"})
+            return
         if length > MAX_BODY_BYTES:
             self._send_json(413, {"error": "Request too large"})
             return
