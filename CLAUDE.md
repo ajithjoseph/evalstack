@@ -82,7 +82,7 @@ tests/
   test_scorer.py     # scorers incl. edge cases and judge reply parsing
   test_core.py       # runner and batch, with a fake model
   test_providers.py  # adapters, with fake SDK clients
-  test_playground.py # playground request handling
+  test_playground.py # playground request handling and HTTP guards
   test_site.py       # website examples run and match the README
 playground/
   server.py          # http.server app, POST /api/score
@@ -94,7 +94,9 @@ site/
 .github/workflows/
   ci.yml             # lint + tests on 3.11-3.13
   pages.yml          # deploys site/ to GitHub Pages
+.github/dependabot.yml # weekly Actions and pip update PRs
 DECISIONS.md         # why things are the way they are
+SECURITY.md          # how to report a vulnerability, known limitations
 .claude/skills/      # task checklists
 ```
 
@@ -120,14 +122,29 @@ DECISIONS.md         # why things are the way they are
 - Commits use conventional prefixes: `feat:`, `test:`, `chore:`, `docs:`, `fix:`.
 - Never put Claude session links (`claude.ai/code/session_...`) in commit
   messages, PR descriptions or comments. The repo is public.
+- Docs and the website only claim what works today. Planned features go on the
+  roadmap, clearly marked.
+
+## Security
+
+See `SECURITY.md` for reporting. When changing code:
+
+- Never commit keys. SDKs read them from the environment; `.env` is ignored.
+- The playground must keep its two guards (D-024): answer only requests whose
+  `Host` is `127.0.0.1`, `localhost` or the bound host, and only accept
+  `Content-Type: application/json` on POST. Both are covered by
+  `tests/test_playground.py`.
+- Workflows get the narrowest `permissions:` that work. CI is read-only.
+- Dependabot opens weekly PRs for Actions and pip (D-025). A ruff bump can add
+  lint rules: fix the findings in the same PR.
 
 ## Known issues (not fixed yet)
 
 - The LLM judge has only been checked against a local fake API, not a live
   model. Its default `pass_threshold` of 0.7 is a starting guess (D-021).
 - `batch` stops at the first provider error and runs cases one at a time (D-022).
-- The README's "Why this exists" list promises hallucination scoring and MCP,
-  which aren't built. The website only claims what works today.
+- evalstack.dev isn't live: GitHub Pages isn't switched on for the repo yet, so
+  the Pages workflow fails at `configure-pages` with "Not Found" (D-023).
 
 ## Checklists
 

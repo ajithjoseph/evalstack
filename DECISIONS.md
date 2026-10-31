@@ -188,3 +188,19 @@ not from the author, so the author should correct anything that's wrong.
 - **Setup outside the repo:** GitHub Pages must be switched on (repo Settings, Pages, Source: GitHub Actions), and the custom domain set there, with DNS records pointing evalstack.dev at GitHub Pages.
 - **Update (2026-10-30):** added `site/basics.html`, a one-page guide to the core ideas, with styles moved to a shared `site/style.css`. Its offline examples are executed by `tests/test_site.py`, so the guide fails CI if it drifts from the code.
 - **Revisit when:** the project needs real docs (API reference, many guides). Then a docs generator earns its keep.
+
+## D-024: The playground refuses foreign Host headers and non-JSON POSTs
+
+- **Context:** A security pass found that any web page the user visits could make their browser call the playground. A cross-site `POST` with `Content-Type: text/plain` needs no CORS preflight, and the server parsed it anyway; with API credentials set, that runs the LLM judge and spends money. A page could also use DNS rebinding (pointing its own hostname at 127.0.0.1) to read the API. A malformed `Content-Length` also crashed the request with no response.
+- **Options:** (a) a random token printed at startup and required on each call, (b) check `Host` and require JSON, (c) leave it, since it's a dev tool.
+- **Chosen (2026-10-31):** (b). The server answers only when the `Host` header names `127.0.0.1`, `localhost`, `::1` or the bound host (403 otherwise), requires `Content-Type: application/json` on `POST` (415 otherwise), and rejects an invalid `Content-Length` with 400.
+- **Why:** Requiring JSON forces browsers to send a preflight for cross-site calls, which this server never approves. The `Host` check stops rebinding. Both are a few lines and need nothing from the user, unlike a token. Covered by HTTP-level tests against a real server.
+- **Revisit when:** the playground is meant to be reached from other machines. Then add a token or auth.
+
+## D-025: Dependabot keeps Actions and pip dependencies current
+
+- **Context:** The deploy logs warn that `actions/checkout@v4` and `actions/configure-pages@v5` still run on Node 20, which GitHub is phasing out.
+- **Options:** bump the versions by hand, pin every action to a commit SHA, or let Dependabot propose updates.
+- **Chosen (2026-10-31):** `.github/dependabot.yml`, weekly, for `github-actions` and `pip`, each grouped into one PR. Actions stay on major-version tags.
+- **Why:** Dependabot opens reviewable PRs that CI tests, so the Node 20 actions get bumped without guessing version numbers. SHA pinning protects against a hijacked tag, but makes every update a manual SHA lookup. With only first-party `actions/*` used, tags are the reasonable trade for now.
+- **Revisit when:** a third-party action is added. Pin that one to a SHA.
