@@ -143,8 +143,6 @@ See `SECURITY.md` for reporting. When changing code:
 - The LLM judge has only been checked against a local fake API, not a live
   model. Its default `pass_threshold` of 0.7 is a starting guess (D-021).
 - `batch` stops at the first provider error and runs cases one at a time (D-022).
-- evalstack.dev isn't live: GitHub Pages isn't switched on for the repo yet, so
-  the Pages workflow fails at `configure-pages` with "Not Found" (D-023).
 
 ## Checklists
 
