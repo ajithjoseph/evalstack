@@ -3,8 +3,8 @@
 > LLM apps are easy to build and hard to trust.
 > EvalStack gives you the eval infrastructure to know the difference.
 
-Open source evaluation and observability framework for production 
-multi-agent AI systems.
+Open source eval framework for LLM and multi-agent systems. Early days:
+it evaluates single LLM calls today, and multi-agent eval is on the roadmap.
 
 ## Why this exists
 

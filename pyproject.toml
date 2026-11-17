@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "evalstack"
 version = "0.0.1"
-description = "Open source eval and observability framework for production multi-agent AI systems."
+description = "Open source eval framework for LLM and multi-agent systems."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [
     {name = "Ajith Joseph", email = "a4ajith@gmail.com"}
 ]
-keywords = ["llm", "eval", "agents", "observability", "ai"]
+keywords = ["llm", "eval", "agents", "ai"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
