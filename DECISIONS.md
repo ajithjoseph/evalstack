@@ -187,6 +187,7 @@ not from the author, so the author should correct anything that's wrong.
 - **Note:** the stock Python `.gitignore` ignored `/site` (MkDocs' build output). That rule was removed since the project doesn't use MkDocs. If MkDocs is adopted later, give its output a different folder.
 - **Setup outside the repo:** GitHub Pages must be switched on (repo Settings, Pages, Source: GitHub Actions), and the custom domain set there, with DNS records pointing evalstack.dev at GitHub Pages.
 - **Update (2026-10-30):** added `site/basics.html`, a one-page guide to the core ideas, with styles moved to a shared `site/style.css`. Its offline examples are executed by `tests/test_site.py`, so the guide fails CI if it drifts from the code.
+- **Update (2026-11-21):** GitHub Pages is on and evalstack.dev is live. Deploys have succeeded since 2026-11-03.
 - **Revisit when:** the project needs real docs (API reference, many guides). Then a docs generator earns its keep.
 
 ## D-024: The playground refuses foreign Host headers and non-JSON POSTs

@@ -57,8 +57,8 @@ or pass `generate=` any function that takes a prompt and returns text.
 ## Learn more
 
 - **Basics guide:** scores, scorers, the runner, the judge and providers, in
-  [`site/basics.html`](site/basics.html). It will be at evalstack.dev once the
-  site is live.
+  [evalstack.dev/basics.html](https://evalstack.dev/basics.html) (source in
+  [`site/basics.html`](site/basics.html)).
 - **Playground:** try scorers in your browser with no API key:
   `python playground/server.py`. See [`playground/README.md`](playground/README.md).
 - **Design decisions:** [`DECISIONS.md`](DECISIONS.md).
